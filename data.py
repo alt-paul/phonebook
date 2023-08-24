@@ -1,132 +1,93 @@
-import data
+import csv
 
 
-def display_menu() -> str:
+def read_entries(filename: str) -> list[dict[str, str]]:
     """
-    Функция для отображения главного меню и возврата выбора пользователя.
+    Функция для чтения записей из файла.
     """
-    print("\n| Главное меню |\n")
-    print("1. Просмотр контактов")
-    print("2. Добавить новый контакт")
-    print("3. Поиск контактов")
-    print("4. Выйти")
-    return input("Введите номер действия: ")
+    entries = []
+    try:
+        with open(filename, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                entries.append(row)
+    except FileNotFoundError:
+        print(f"Файл {filename} не найден.")
+    except Exception as e:
+        print(f"Произошла ошибка при чтении файла: {e}")
+    return entries
 
 
-def show_contact(entry: dict[str, str]) -> None:
+def write_entries(filename: str, entries: list[dict[str, str]]) -> None:
     """
-    Функция для отображения одного контакта.
+    Функция для записи контактов в файл.
     """
-    print()
-    for key, value in entry.items():
-        print(f"{key}: {value}")
+    try:
+        with open(filename, 'w', newline='', encoding='utf-8') as file:
+            fieldnames = entries[0].keys() if entries else []
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(entries)
+    except Exception as e:
+        print(f"Произошла ошибка при записи файла: {e}")
 
 
-def display_actions() -> str:
+def validate_entry(entry: dict[str, str]) -> bool:
     """
-    Функция для отображения меню действий с контактом и возврата выбора пользователя.
+    Проверка на минимальное заполнение формы для сохранения контакта.
     """
-    while True:
-        print("\n| Выберите действие |\n")
-        print("1. Редактировать контакт")
-        print("2. Удалить контакт")
-        print("3. Следующий контакт")
-        print("4. Вернуться в главное меню")
-        ans = input("Введите номер действия: ")
-        if ans in ('1', '2', '3', '4'):
-            return ans
-        else:
-            print("\n< Неверный выбор. Пожалуйста, выберите корректный номер действия. >")
+    phone_fields = ['телефон рабочий', 'телефон личный(сотовый)']
+    other_fields = ['фамилия', 'имя', 'отчество', 'название организации']
+    has_phone = any(entry[field] for field in phone_fields)
+    has_other = any(entry[field] for field in other_fields)
+    return has_phone and has_other
 
 
-def short_display_actions() -> str:
+def add_entry(entries: list[dict[str, str]]) -> None:
     """
-    Функция для отображения короткого меню действий с контактом и возврата выбора пользователя.
+    Функция для добавления нового контакта.
     """
-    while True:
-        print("\n| Выберите действие |\n")
-        print("1. Редактировать контакт")
-        print("2. Удалить контакт")
-        print("3. Вернуться в главное меню")
-        ans = input("Введите номер действия: ")
-        if ans in ('1', '2', '3'):
-            return ans
-        else:
-            print("\n< Неверный выбор. Пожалуйста, выберите корректный номер действия. >")
+    fields = ['фамилия', 'имя', 'отчество', 'название организации', 'телефон рабочий', 'телефон личный(сотовый)']
+    entry = {}
+    print("\n| Добавление контакта |\n")
+    for field in fields:
+        entry[field] = input(f"Введите значение для поля \033[92m{field}\033[0m: ")
+
+    if validate_entry(entry):
+        entries.append(entry)  # Добавляем новую запись в список
+        entries.sort(key=lambda x: (x['фамилия'].lower(), x['имя'].lower(), x['отчество'].lower()))  #сортируем список
+        print("\n< \033[92mЗапись добавлена\033[0m >")
+    else:
+        print("\nОшибка: Должен быть номер телефона и хотя бы одно другое поле.")
 
 
-def action_with_contact(entries: list[dict[str, str]], index: int) -> None:
+def edit_entry(entries: list[dict[str, str]], index: int) -> None:
     """
-    Функция для действий с контактом.
+    Функция для редактирования записи.
     """
-    while True:
-        if not entries:
-            print("\n< Список контактов пуст >")
-            return
-        print(f'\n| {index+1}/{len(entries)} |')
-        show_contact(entries[index])
-        choice = display_actions()
-        if choice == '1':
-            data.edit_entry(entries, index)
-        elif choice == '2':
-            data.delete_entry(entries, index)
-        elif choice == '3':
-            index = (index + 1) % len(entries)
-        elif choice == '4':
-            break
-        else:
-            print("Что-то пошло не так...")
+    entry = entries[index]
+    print("\n| Режим редактирования |\n")
+    for key in entry.keys():
+        entry[key] = input(f"{key}: {entry[key]}\nВведите новое значение {key}: ")
+    print("\n< \033[92mЗапись успешно изменена\033[0m >")
 
 
-def get_search_criteria() -> dict[str, str]:
+def search_entries(entries: list[dict[str, str]], search_criteria: dict[str, str]) -> list[int]:
     """
-    Функция для получения от пользователя данных для поиска.
+    Функция для поиска контактов по одному или нескольким полям.
     """
-    search_criteria = {}
-    search_params = ['фамилия', 'имя', 'отчество', 'название организации', 'телефон рабочий', 'телефон личный(сотовый)']
-    while True:
-        print('\n| поиск |\n')
-        for param in search_params:
-            value = input(f"Введите значение для параметра '\033[92m{param}\033[0m' или клавишу '\033[92mEnter\033[0m' для пропуска: ")
-            if value:
-                search_criteria[param] = value
-        if search_criteria:
-            return search_criteria
-        else:
-            print("Нет значений для поиска. Введите хотя бы одно значение.")
+    indices = []
+    for index, entry in enumerate(entries):
+        if all(value.lower() in entry[key].lower() for key, value in search_criteria.items()):
+            indices.append(index)
+    return indices
 
 
-def show_search_results(entries: list[dict[str, str]], results: list[int]) -> None:
+def delete_entry(entries: list[dict[str, str]], index: int) -> None:
     """
-    Функция для работы с результатами поиска.
+    Функция для удаления записи.
     """
-    if not results:
-        print("\n\033[92mКонтакты не найдены.\033[0m")
-        return
-    amount, num = len(results), 0
-    print(f"\n\033[92mНайдено контактов: {amount}\033[0m")
-
-    while amount > 1:
-        num += 1
-        amount -= 1
-        print(f"\n< результат {num}/{len(results)} >")
-        show_contact(entries[results[num-1]])
-        choice = display_actions()
-        if choice == '1':
-            data.edit_entry(entries, results[num-1])
-        elif choice == '2':
-            data.delete_entry(entries, results[num-1])
-            results = list(i - 1 for i in results)
-        elif choice == '3':
-            continue
-        elif choice == '4':
-            return
-        else:
-            print("Что-то пошло не так...")
-    print(f"\n< результат {len(results)}/{len(results)} >")
-    show_contact(entries[results[-1]])
-    choice = short_display_actions()
+    choice = input('\nДля подтверждения нажмите "\033[92m1\033[0m" или любую клавишу для отмены')
     if choice == '1':
-        data.edit_entry(entries, results[-1])
-    elif choice == '2':
-        data.delete_entry(entries, results[-1])
+        del entries[index]
+        print("\n< \033[92mЗапись успешно удалена\033[0m >")
